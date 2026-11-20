@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="slate" data-dyslexic="false">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Anon — Ephemeral anonymous peer support, live cross-tab matchmaking, vent wall, and wellness toolkit.">
+  <title>Anon — Anonymous Peer Support & Live Chat</title>
+
+  <!-- Bootstrap 5 & Tailwind CSS & FontAwesome -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Theme color tokens */
+    [data-theme="slate"]   { --bg: #020617; }
+    [data-theme="purple"]  { --bg: #1e1b4b; }
+    [data-theme="emerald"] { --bg: #022c22; }
+    [data-theme="amber"]   { --bg: #451a03; }
+
+    html body#app-body {
+      background-color: var(--bg);
+      transition: background-color 0.4s ease;
+    }
+
+    /* Accessible spacing font toggle */
+    html[data-dyslexic="true"] body,
+    html[data-dyslexic="true"] button,
+    html[data-dyslexic="true"] input,
+    html[data-dyslexic="true"] select,
+    html[data-dyslexic="true"] textarea {
+      font-family: Verdana, Tahoma, sans-serif !important;
+      letter-spacing: 0.04em;
+      word-spacing: 0.12em;
+      line-height: 1.7;
+    }
+
+    /* Glassmorphism surfaces */
+    .glass {
+      background: rgba(30, 41, 59, 0.68);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+    }
+
+    .glass-header {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Matchmaking radar pulse */
+    @keyframes ping {
+      0%   { transform: scale(0.8); opacity: 0.8; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+    .pulse-ring {
+      animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+
+    /* 4-7-8 breathing cycle (4s inhale, 7s hold, 8s exhale = 19s total) */
+    @keyframes breath {
+      0%   { transform: scale(1);   opacity: 0.5; }
+      21%  { transform: scale(1.6); opacity: 0.95; }
+      58%  { transform: scale(1.6); opacity: 0.95; }
+      100% { transform: scale(1);   opacity: 0.5; }
+    }
+    .breathing {
+      animation: breath 19s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pulse-ring, .breathing {
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body id="app-body" class="text-slate-100 font-sans antialiased min-h-screen flex flex-col">
+
+  <!-- ═══════════ INSTANT SAFE SCREEN MASK ═══════════ -->
+  <div id="safe-mask" class="hidden fixed inset-0 z-[100] bg-emerald-950 text-emerald-100 flex items-center justify-center p-6 text-center">
+    <div class="max-w-md space-y-5">
+      <div class="w-16 h-16 mx-auto rounded-full bg-emerald-900/70 flex items-center justify-center text-emerald-300 text-2xl">
+        <i class="fa-solid fa-leaf" aria-hidden="true"></i>
+      </div>
+      <h2 class="text-2xl font-bold">Calm Breathing Break</h2>
+      <p class="text-sm text-emerald-200/80">Your screen is masked and your session is paused safely.</p>
+      <div class="flex gap-3 justify-center pt-2">
+        <button data-action="unmask" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-sm">
+          Return to Anon
+        </button>
+        <button data-action="panic" class="px-5 py-2.5 rounded-xl bg-emerald-900 hover:bg-emerald-800 text-emerald-200 text-sm">
+          Leave Site
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ STICKY HEADER ═══════════ -->
+  <header class="sticky top-0 z-50 glass-header">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-2">
+      <a href="#home" class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-full overflow-hidden">
+          <img src="assets/anon-logo.png" alt="Anon Logo" class="w-full h-full object-cover rounded-full">
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-xl">Anon</span>
+            <span id="live-peers-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              1 tab active
+            </span>
+          </div>
+          <div id="header-user" class="text-[10px] text-indigo-300 font-mono hidden"></div>
+        </div>
+      </a>
+
+      <nav class="hidden lg:flex gap-1 text-sm">
+        <a href="#matchmaking" class="px-3 py-2 rounded-lg hover:bg-slate-800/60">Live Match</a>
+        <a href="#friends" class="px-3 py-2 rounded-lg hover:bg-slate-800/60">Friends &amp; DMs</a>
+        <a href="#ventwall" class="px-3 py-2 rounded-lg hover:bg-slate-800/60">Vent Wall</a>
+        <a href="#wellness" class="px-3 py-2 rounded-lg hover:bg-slate-800/60">Wellness</a>
+      </nav>
+
+      <div class="flex items-center gap-1.5">
+        <!-- Theme Switcher -->
+        <div class="relative">
+          <button data-action="toggleThemeMenu" id="theme-menu-btn" aria-expanded="false" aria-label="Theme"
+                  class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700">
+            <i class="fa-solid fa-palette text-indigo-400" aria-hidden="true"></i>
+          </button>
+          <div id="theme-menu" class="hidden absolute right-0 mt-2 w-32 rounded-xl bg-slate-900 border border-slate-700 shadow-xl py-1 text-xs z-50">
+            <button data-action="theme" data-theme="slate" class="w-full text-left px-3 py-2 hover:bg-slate-800">Slate</button>
+            <button data-action="theme" data-theme="purple" class="w-full text-left px-3 py-2 hover:bg-slate-800">Purple</button>
+            <button data-action="theme" data-theme="emerald" class="w-full text-left px-3 py-2 hover:bg-slate-800">Emerald</button>
+            <button data-action="theme" data-theme="amber" class="w-full text-left px-3 py-2 hover:bg-slate-800">Amber</button>
+          </div>
+        </div>
+
+        <!-- Font Size Controls -->
+        <button data-action="font" data-delta="-1" class="hidden sm:block px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs" aria-label="Decrease font">A−</button>
+        <button data-action="font" data-delta="1" class="hidden sm:block px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs" aria-label="Increase font">A+</button>
+
+        <!-- Readable Spacing Toggle -->
+        <button data-action="dyslexic" id="dyslexic-btn" aria-pressed="false"
+                class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700" aria-label="Readable spacing">
+          <i class="fa-solid fa-font" aria-hidden="true"></i>
+        </button>
+
+        <!-- Crisis Hotlines Modal Trigger -->
+        <button data-action="openModal" data-modal="crisis-modal"
+                class="px-3 py-1.5 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white text-xs font-semibold">
+          <i class="fa-solid fa-heart-pulse" aria-hidden="true"></i> Hotlines
+        </button>
+
+        <!-- Instant Mask -->
+        <button data-action="mask" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-emerald-900/60 text-xs font-semibold" title="Mask screen">
+          <i class="fa-solid fa-eye-slash text-emerald-400" aria-hidden="true"></i> <span class="hidden sm:inline">Mask</span>
+        </button>
+
+        <!-- External Decoy Redirect (also triggered by double-Escape) -->
+        <button data-action="panic" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-red-900/60 text-xs font-semibold" title="Double-tap Esc to exit">
+          <i class="fa-solid fa-shield-cat text-red-400" aria-hidden="true"></i> Exit
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══════════ ROTATING AFFIRMATION BANNER ═══════════ -->
+  <div class="bg-indigo-950/40 border-b border-indigo-500/10 py-2 px-4">
+    <div class="max-w-5xl mx-auto flex items-center justify-between gap-4 text-sm">
+      <i class="fa-solid fa-sparkles text-indigo-400" aria-hidden="true"></i>
+      <span id="affirmation-text" class="italic text-slate-300 grow text-center transition-opacity duration-300">
+        "You don't have to carry it all by yourself."
+      </span>
+      <div class="flex gap-1">
+        <button data-action="aff" data-dir="-1" class="p-1 hover:text-white" aria-label="Previous"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+        <button data-action="affPause" id="aff-pause-btn" class="p-1 hover:text-white" aria-label="Pause"><i class="fa-solid fa-pause" aria-hidden="true"></i></button>
+        <button data-action="aff" data-dir="1" class="p-1 hover:text-white" aria-label="Next"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 py-10 space-y-20 grow w-full">
+
+    <!-- ═══════════ HERO ═══════════ -->
+    <section id="home" class="text-center pt-2">
+      <h1 class="text-4xl sm:text-5xl font-extrabold text-white max-w-3xl mx-auto leading-tight">
+        Your Safe Haven in the
+        <span class="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400">Digital Dark</span>
+      </h1>
+      <p class="mt-4 text-base text-slate-300 max-w-2xl mx-auto">
+        Real multi-tab peer matching, ephemeral chats, community vent wall, and wellness tools—zero tracking.
+      </p>
+    </section>
+
+    <!-- ═══════════ LIVE PEER MATCHMAKER & CHAT ═══════════ -->
+    <section id="matchmaking" class="scroll-mt-20">
+      <div class="text-center mb-8">
+        <h2 class="text-3xl font-bold text-white">Live Peer Matchmaker &amp; Chat</h2>
+        <p class="text-xs text-slate-400 mt-1">Open a second browser tab to pair two real tabs together, or use Solo Practice Peer if alone.</p>
+      </div>
+
+      <div class="grid lg:grid-cols-12 gap-6">
+        <!-- Matchmaker Controls -->
+        <div class="lg:col-span-5 glass p-6 rounded-3xl space-y-4 h-fit">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-2">1. Choose Your Role</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button data-action="role" data-role="ventor" aria-pressed="true"
+                      class="role-btn p-3 rounded-xl border border-indigo-500 bg-indigo-500/20 text-xs flex flex-col items-center gap-1">
+                <i class="fa-solid fa-comment-dots" aria-hidden="true"></i> Ventor
+              </button>
+              <button data-action="role" data-role="listener" aria-pressed="false"
+                      class="role-btn p-3 rounded-xl border border-slate-700 bg-slate-800/50 text-xs flex flex-col items-center gap-1">
+                <i class="fa-solid fa-ear-listen" aria-hidden="true"></i> Listener
+              </button>
+              <button data-action="role" data-role="random" aria-pressed="false"
+                      class="role-btn p-3 rounded-xl border border-slate-700 bg-slate-800/50 text-xs flex flex-col items-center gap-1">
+                <i class="fa-solid fa-shuffle" aria-hidden="true"></i> Either
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 uppercase mb-2">2. Mood / Topic</label>
+            <div class="flex flex-wrap gap-2">
+              <button data-action="mood" data-mood="Anxious" aria-pressed="false" class="mood-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/60 text-xs">😰 Anxious</button>
+              <button data-action="mood" data-mood="Sad" aria-pressed="false" class="mood-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/60 text-xs">💔 Sad</button>
+              <button data-action="mood" data-mood="Overwhelmed" aria-pressed="false" class="mood-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/60 text-xs">🤯 Overwhelmed</button>
+              <button data-action="mood" data-mood="Advice" aria-pressed="false" class="mood-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/60 text-xs">💡 Advice</button>
+              <button data-action="mood" data-mood="Venting" aria-pressed="false" class="mood-btn px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/60 text-xs">🗣️ Venting</button>
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-1">
+            <button data-action="match" id="find-match-btn"
+                    class="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm">
+              <i class="fa-solid fa-radar" aria-hidden="true"></i> Search Live Peer Queue
+            </button>
+
+            <button data-action="practiceBot" id="practice-bot-btn"
+                    class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium">
+              <i class="fa-solid fa-robot text-indigo-400" aria-hidden="true"></i> Solo Practice Peer (Single Tab)
+            </button>
+          </div>
+
+          <!-- Matchmaking Queue Radar -->
+          <div id="radar" class="hidden flex-col items-center p-5 bg-slate-900/80 border border-indigo-500/30 rounded-2xl text-center">
+            <div class="relative w-16 h-16 flex items-center justify-center mx-auto">
+              <div class="absolute inset-0 rounded-full bg-indigo-500/20 pulse-ring"></div>
+              <div class="w-12 h-12 rounded-full bg-indigo-600/30 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i>
+              </div>
+            </div>
+            <p class="text-xs text-slate-200 mt-3 font-medium">Broadcasting in live peer queue...</p>
+            <p class="text-[11px] text-slate-400 mt-1">Open another tab and click "Search Live Peer Queue" to connect!</p>
+            <button data-action="cancelMatch" class="mt-3 text-xs text-rose-400 hover:underline">Cancel Queue</button>
+          </div>
+
+          <!-- Icebreaker Generator -->
+          <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-300"><i class="fa-solid fa-lightbulb text-amber-400" aria-hidden="true"></i> Icebreaker</span>
+              <button data-action="nextIcebreaker" class="text-indigo-400 hover:text-indigo-300">Shuffle</button>
+            </div>
+            <p id="icebreaker-text" class="text-xs text-slate-300 italic">"What's one small thing that brought you a bit of relief recently?"</p>
+            <button data-action="useIcebreaker" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300">
+              Insert into chat
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Room -->
+        <div class="lg:col-span-7 glass rounded-3xl flex flex-col h-[560px]">
+          <div class="p-4 border-b border-slate-800 flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-2.5">
+              <div id="chat-avatar" class="w-9 h-9 rounded-full bg-purple-600/30 flex items-center justify-center text-sm font-bold">?</div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <span id="chat-peer-name" class="text-sm font-semibold">Not Connected</span>
+                  <span id="chat-peer-badge" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400">Standby</span>
+                </div>
+                <div class="text-xs text-slate-400 flex items-center gap-2">
+                  <span id="chat-timer" class="text-emerald-400 font-mono">00:00</span>
+                  <span id="chat-mode-note">• Ready when you are</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <label for="burn-select" class="sr-only">Burn timer</label>
+              <select id="burn-select" data-action="burn" class="bg-slate-800 border border-slate-700 text-xs rounded-lg px-2 py-1">
+                <option value="off">Burn: Off</option>
+                <option value="1m">Burn: 1 min</option>
+                <option value="leave">Burn: On leave</option>
+              </select>
+              <button data-action="exportChat" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs" title="Download transcript">
+                <i class="fa-solid fa-download" aria-hidden="true"></i>
+              </button>
+              <button data-action="clearChat" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">
+                Clear
+              </button>
+              <button data-action="openModal" data-modal="report-modal" class="px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs" title="Report or block">
+                <i class="fa-solid fa-flag" aria-hidden="true"></i>
+              </button>
+              <button data-action="disconnect" class="px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 text-xs font-semibold">End</button>
+            </div>
+          </div>
+
+          <div id="chat-messages" class="grow p-4 overflow-y-auto space-y-3 text-sm" role="log">
+            <div class="text-center my-2">
+              <span class="px-3 py-1 rounded-full bg-slate-800/80 text-xs text-slate-400">🔒 Choose a role on the left or open a Friend DM below</span>
+            </div>
+          </div>
+
+          <!-- Anti-Doxxing Warning -->
+          <div id="pii-warning" class="hidden mx-3 mb-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-xs text-amber-200 flex items-center justify-between gap-2 flex-wrap">
+            <span><i class="fa-solid fa-triangle-exclamation text-amber-400" aria-hidden="true"></i> Looks like personal info (phone, email, or @handle). Send anyway?</span>
+            <div class="flex gap-1.5">
+              <button data-action="forceSend" class="px-2.5 py-1 rounded bg-amber-500 text-slate-950 font-semibold">Send Anyway</button>
+              <button data-action="dismissPii" class="px-2.5 py-1 rounded bg-slate-800 text-slate-300">Edit</button>
+            </div>
+          </div>
+
+          <div id="typing" class="hidden px-4 py-1 text-xs text-indigo-300 italic">Peer is typing...</div>
+
+          <div class="p-3 border-t border-slate-800 flex gap-2">
+            <input id="chat-input" type="text" placeholder="Type anonymously... (press / to focus)" maxlength="500"
+                   class="grow bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-500">
+            <button data-action="send" aria-label="Send" class="px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white">
+              <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ FRIENDS & DIRECT MESSAGES ═══════════ -->
+    <section id="friends" class="scroll-mt-20">
+      <h2 class="text-3xl font-bold text-white text-center mb-2">Friends &amp; Direct Messages</h2>
+      <p class="text-center text-sm text-slate-400 mb-8">
+        Log in as <code>alice</code> in Tab 1 and <code>bob</code> in Tab 2 for real-time cross-tab DMs.
+      </p>
+
+      <div class="max-w-3xl mx-auto glass rounded-3xl p-6 space-y-6">
+        <div id="auth-logged-out">
+          <label for="auth-username" class="block text-xs font-semibold text-slate-300 uppercase mb-2">Username</label>
+          <div class="flex gap-2 flex-wrap">
+            <input id="auth-username" type="text" placeholder="e.g. alice (3–16 chars, a-z 0-9 _)" maxlength="16"
+                   class="grow min-w-0 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
+            <button data-action="login" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold">Log in / Create</button>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-2">Seed accounts: <code>alice</code>, <code>bob</code>, <code>charlie</code>, <code>dave</code>.</p>
+        </div>
+
+        <div id="auth-logged-in" class="hidden">
+          <div class="flex items-center justify-between flex-wrap gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+            <div>
+              <div class="text-xs text-slate-400 uppercase">Signed in as</div>
+              <div class="flex items-center gap-2 mt-0.5">
+                <b id="auth-name" class="text-lg"></b>
+                <span id="auth-handle" class="text-xs text-slate-400 font-mono"></span>
+              </div>
+            </div>
+            <button data-action="logout" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300">Log out</button>
+          </div>
+        </div>
+
+        <div id="friends-panel" class="hidden space-y-6">
+          <div>
+            <label for="friend-search" class="block text-xs font-semibold text-slate-300 uppercase mb-2">Find User</label>
+            <div class="flex gap-2 flex-wrap">
+              <input id="friend-search" type="text" placeholder="Search username..." maxlength="16"
+                     class="grow min-w-0 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
+              <button data-action="userLookup" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold">Find</button>
+            </div>
+            <div id="user-lookup-result" class="mt-3 space-y-2"></div>
+          </div>
+
+          <div>
+            <h3 class="text-xs font-semibold text-slate-300 uppercase mb-2 flex items-center gap-2">
+              <i class="fa-solid fa-inbox text-amber-400" aria-hidden="true"></i> Incoming Requests
+              <span id="pending-count" class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300"></span>
+            </h3>
+            <div id="pending-list" class="space-y-2"></div>
+          </div>
+
+          <div>
+            <h3 class="text-xs font-semibold text-slate-300 uppercase mb-2 flex items-center gap-2">
+              <i class="fa-solid fa-paper-plane text-indigo-400" aria-hidden="true"></i> Sent Requests
+            </h3>
+            <div id="outgoing-list" class="space-y-2"></div>
+          </div>
+
+          <div>
+            <h3 class="text-xs font-semibold text-slate-300 uppercase mb-2 flex items-center gap-2">
+              <i class="fa-solid fa-user-group text-emerald-400" aria-hidden="true"></i> My Friends
+              <span id="friends-count" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300"></span>
+            </h3>
+            <div id="friends-list" class="space-y-2"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ COMMUNITY VENT WALL ═══════════ -->
+    <section id="ventwall" class="scroll-mt-20">
+      <div class="flex flex-col md:flex-row justify-between gap-4 mb-6">
+        <h2 class="text-3xl font-bold text-white">Community Vent Wall</h2>
+        <div class="flex gap-2 text-xs flex-wrap" role="group" aria-label="Filter">
+          <button data-action="ventFilter" data-filter="all" aria-pressed="true" class="px-3 py-1.5 rounded-full bg-indigo-600 text-white font-medium">All</button>
+          <button data-action="ventFilter" data-filter="Venting" aria-pressed="false" class="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700">Venting</button>
+          <button data-action="ventFilter" data-filter="Advice" aria-pressed="false" class="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700">Advice</button>
+          <button data-action="ventFilter" data-filter="Gratitude" aria-pressed="false" class="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700">Gratitude</button>
+          <button data-action="ventFilter" data-filter="Hope" aria-pressed="false" class="px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700">Hope</button>
+        </div>
+      </div>
+
+      <div class="grid lg:grid-cols-12 gap-6">
+        <div class="lg:col-span-4 glass p-6 rounded-3xl space-y-4 h-fit">
+          <textarea id="vent-input" rows="4" maxlength="500" placeholder="What's heavy on your mind?"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-2xl p-3 text-sm resize-none focus:outline-none focus:border-indigo-500"></textarea>
+          <div class="flex justify-between gap-2">
+            <select id="vent-tag-select" class="bg-slate-800 border border-slate-700 text-xs rounded-xl px-3 py-2">
+              <option value="Venting">Venting</option>
+              <option value="Advice">Advice</option>
+              <option value="Gratitude">Gratitude</option>
+              <option value="Hope">Hope</option>
+            </select>
+            <button data-action="ventPost" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs">
+              Post Anonymously
+            </button>
+          </div>
+        </div>
+
+        <div id="vent-cards" class="lg:col-span-8 space-y-4"></div>
+      </div>
+    </section>
+
+    <!-- ═══════════ WELLNESS TOOLKIT ═══════════ -->
+    <section id="wellness" class="scroll-mt-20">
+      <h2 class="text-3xl font-bold text-white text-center mb-8">Wellness Toolkit</h2>
+      <div class="grid lg:grid-cols-2 gap-6">
+        <!-- Ambient Soundscapes -->
+        <div class="glass p-6 rounded-3xl space-y-4">
+          <h3 class="font-semibold text-lg">Ambient Soundscapes</h3>
+          <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-900/60 gap-2 flex-wrap">
+            <div class="flex items-center gap-3"><i class="fa-solid fa-cloud-rain text-indigo-400" aria-hidden="true"></i> Gentle Rain</div>
+            <div class="flex items-center gap-2">
+              <label for="vol-rain" class="sr-only">Rain volume</label>
+              <input id="vol-rain" data-volume="rain" type="range" min="0" max="1" step="0.01" value="0.3" class="w-24 accent-indigo-500">
+              <button data-action="audio" data-audio="rain" id="btn-rain" aria-pressed="false" class="px-3 py-1.5 rounded-lg bg-indigo-600/30 text-indigo-200 text-xs">Play</button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-900/60 gap-2 flex-wrap">
+            <div class="flex items-center gap-3"><i class="fa-solid fa-water text-teal-400" aria-hidden="true"></i> Ocean Waves</div>
+            <div class="flex items-center gap-2">
+              <label for="vol-ocean" class="sr-only">Ocean volume</label>
+              <input id="vol-ocean" data-volume="ocean" type="range" min="0" max="1" step="0.01" value="0.3" class="w-24 accent-teal-500">
+              <button data-action="audio" data-audio="ocean" id="btn-ocean" aria-pressed="false" class="px-3 py-1.5 rounded-lg bg-teal-600/30 text-teal-200 text-xs">Play</button>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500 italic">Synthesized locally via Web Audio API.</p>
+        </div>
+
+        <!-- 4-7-8 Breathing Visualizer -->
+        <div class="glass p-6 rounded-3xl flex flex-col items-center justify-center gap-4">
+          <h3 class="font-semibold text-lg">4-7-8 Breathing</h3>
+          <p class="text-xs text-slate-400">Inhale 4s • Hold 7s • Exhale 8s</p>
+          <div class="relative w-32 h-32 flex items-center justify-center">
+            <div id="breathing-ring" class="absolute inset-0 rounded-full bg-gradient-to-tr from-indigo-500 to-teal-400 opacity-40 blur-sm"></div>
+            <div class="w-24 h-24 rounded-full bg-slate-900 border-2 border-indigo-400/60 flex items-center justify-center z-10">
+              <span id="breathing-label" class="text-xs font-bold text-indigo-300">Tap Start</span>
+            </div>
+          </div>
+          <button data-action="breath" id="breathing-btn" class="px-6 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold">
+            Start Breathing
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══════════ CRISIS MODAL ═══════════ -->
+  <div id="crisis-modal" role="dialog" aria-modal="true" aria-labelledby="crisis-title"
+       class="app-modal hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-rose-300 font-bold text-base" id="crisis-title">
+          <i class="fa-solid fa-heart-pulse" aria-hidden="true"></i> Crisis Support
+        </h3>
+        <button data-action="closeModal" data-modal="crisis-modal" class="text-slate-400 hover:text-white" aria-label="Close">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="text-xs space-y-2">
+        <p class="text-slate-300">Free, confidential, 24/7 help is available.</p>
+        <div class="p-3 rounded-xl bg-slate-950 flex justify-between items-center gap-2"><div><b>🇺🇸 US &amp; Canada:</b> 988</div><button data-action="copy" data-text="988" class="px-3 py-1 rounded bg-slate-800 text-indigo-300">Copy</button></div>
+        <div class="p-3 rounded-xl bg-slate-950 flex justify-between items-center gap-2"><div><b>🇬🇧 UK:</b> 116 123</div><button data-action="copy" data-text="116123" class="px-3 py-1 rounded bg-slate-800 text-indigo-300">Copy</button></div>
+        <div class="p-3 rounded-xl bg-slate-950 flex justify-between items-center gap-2"><div><b>🇮🇳 India:</b> 1800-599-0019</div><button data-action="copy" data-text="18005990019" class="px-3 py-1 rounded bg-slate-800 text-indigo-300">Copy</button></div>
+        <div class="p-3 rounded-xl bg-slate-950 flex justify-between items-center gap-2"><div><b>🇦🇺 Australia:</b> 13 11 14</div><button data-action="copy" data-text="131114" class="px-3 py-1 rounded bg-slate-800 text-indigo-300">Copy</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ REPORT / BLOCK MODAL ═══════════ -->
+  <div id="report-modal" role="dialog" aria-modal="true" aria-labelledby="report-title"
+       class="app-modal hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-amber-300 font-bold text-base" id="report-title">
+          <i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Safety Action
+        </h3>
+        <button data-action="closeModal" data-modal="report-modal" class="text-slate-400 hover:text-white" aria-label="Close">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="text-xs space-y-3">
+        <p class="text-slate-300">Block this peer and end the active session immediately:</p>
+        <div class="space-y-1.5">
+          <button data-action="reportPeer" data-reason="Harassment or hate speech" class="w-full text-left p-3 rounded-xl bg-slate-950 hover:bg-slate-800">Harassment or hate speech</button>
+          <button data-action="reportPeer" data-reason="Asking for personal info" class="w-full text-left p-3 rounded-xl bg-slate-950 hover:bg-slate-800">Asking for personal contact details</button>
+          <button data-action="reportPeer" data-reason="Spam or inappropriate content" class="w-full text-left p-3 rounded-xl bg-slate-950 hover:bg-slate-800">Spam or inappropriate content</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ TOAST STACK ═══════════ -->
+  <div id="toasts" class="fixed bottom-4 right-4 z-50 space-y-2 max-w-xs w-full pointer-events-none" aria-live="polite"></div>
+
+  <footer class="border-t border-slate-800 py-6 text-xs text-slate-400 text-center">
+    <p>Anon • Peer Support Platform — Not a replacement for professional medical or mental health care.</p>
+  </footer>
+
+  <!-- ═══════════ APPLICATION SCRIPT ═══════════ -->
+  <script>
+    'use strict';
+
+    const DECOY_URL  = 'https://www.bbc.com/news';
+    const DB_KEY     = 'anon-db-v2';
+    const VENTS_KEY  = 'anon-vents-v1';
+    const ME_KEY     = 'anon-me';
+    const MY_VENTS_K = 'anon-my-vents';
+
+    const $  = s => document.querySelector(s);
+    const $$ = s => [...document.querySelectorAll(s)];
+
+    function uuid() {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = (Math.random() * 16) | 0;
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+      });
+    }
+
+    function newPeerId() {
+      const adj  = ['Kind', 'Calm', 'Quiet', 'Gentle', 'Still', 'Warm', 'Soft', 'Bright'];
+      const noun = ['Stranger', 'Moth', 'Fern', 'Water', 'Ember', 'Owl', 'Panda', 'Lynx'];
+      return `${adj[Math.floor(Math.random() * adj.length)]}${noun[Math.floor(Math.random() * noun.length)]}#${uuid().slice(0, 4)}`;
+    }
+
+    function threadId(a, b) {
+      return [a, b].sort().join('::');
+    }
+
+    /* ── TAB IDENTITY & BROADCAST CHANNEL ───────── */
+    const TAB_ID = uuid();
+    const MY_ANON_HANDLE = newPeerId();
+    const channel = ('BroadcastChannel' in window) ? new BroadcastChannel('anon-live-mesh') : null;
+    const knownTabs = new Map([[TAB_ID, Date.now()]]);
+
+    const S = {
+      theme: 'slate',
+      font: 100,
+      dyslexic: false,
+      role: 'ventor',
+      moods: new Set(),
+      searching: false,
+      chatMode: 'idle', // 'idle' | 'live' | 'bot' | 'dm'
+      roomId: null,
+      peerTabId: null,
+      peer: 'Not Connected',
+      blockedPeers: new Set(),
+      pendingPiiText: null,
+      lastSentAt: 0,
+      burn: 'off',
+      ventFilter: 'all',
+      sessionStart: null,
+      sessionTimer: null,
+      typingTimeout: null
+    };
+
+    /* ── PREFS & TOASTS ─────────────────────────── */
+    function loadPrefs() {
+      try {
+        const p = JSON.parse(localStorage.getItem('anon-prefs') || '{}');
+        if (p.theme) { S.theme = p.theme; document.documentElement.dataset.theme = p.theme; }
+        if (p.font)  { S.font = p.font;  document.documentElement.style.fontSize = p.font + '%'; }
+        if (p.dyslexic) {
+          S.dyslexic = true;
+          document.documentElement.dataset.dyslexic = 'true';
+          $('#dyslexic-btn').setAttribute('aria-pressed', 'true');
+        }
+      } catch {}
+    }
+
+    function savePrefs() {
+      try {
+        localStorage.setItem('anon-prefs', JSON.stringify({
+          theme: S.theme, font: S.font, dyslexic: S.dyslexic
+        }));
+      } catch {}
+    }
+
+    function toast(msg, tone = 'info') {
+      const styles = {
+        info:    'bg-slate-800 border-slate-700 text-slate-100',
+        success: 'bg-emerald-950 border-emerald-700 text-emerald-100',
+        error:   'bg-rose-950 border-rose-700 text-rose-100'
+      };
+      const el = document.createElement('div');
+      el.className = `pointer-events-auto px-4 py-3 rounded-2xl border shadow-xl text-xs font-medium transition-opacity duration-300 ${styles[tone] || styles.info}`;
+      el.textContent = msg;
+      $('#toasts').appendChild(el);
+      setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3000);
+    }
+
+    async function copy(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast(`Copied: ${text}`, 'success');
+      } catch {
+        try {
+          const tmp = document.createElement('input');
+          tmp.value = text;
+          document.body.appendChild(tmp);
+          tmp.select();
+          document.execCommand('copy');
+          tmp.remove();
+          toast(`Copied: ${text}`, 'success');
+        } catch {
+          toast('Copy failed — select manually', 'error');
+        }
+      }
+    }
+
+    function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
+    function panicExit() { window.location.replace(DECOY_URL); }
+
+    /* ── LIVE MULTI-TAB MATCHMAKING MESH ────────── */
+    function broadcast(payload) {
+      if (channel) channel.postMessage({ ...payload, fromTab: TAB_ID, ts: Date.now() });
+    }
+
+    function updateActiveTabCount() {
+      const now = Date.now();
+      for (const [id, lastSeen] of knownTabs) {
+        if (id !== TAB_ID && now - lastSeen > 7000) knownTabs.delete(id);
+      }
+      const count = knownTabs.size;
+      const badge = $('#live-peers-badge');
+      if (badge) badge.textContent = `${count} tab${count === 1 ? '' : 's'} active`;
+    }
+
+    function rolesCompatible(r1, r2) {
+      if (r1 === 'random' || r2 === 'random') return true;
+      return (r1 === 'ventor' && r2 === 'listener') || (r1 === 'listener' && r2 === 'ventor');
+    }
+
+    if (channel) {
+      channel.onmessage = ({ data }) => {
+        if (!data || data.fromTab === TAB_ID) return;
+        knownTabs.set(data.fromTab, Date.now());
+        updateActiveTabCount();
+
+        if (data.type === 'SEEK_PEER' && S.searching && !S.blockedPeers.has(data.handle)) {
+          if (rolesCompatible(S.role, data.role)) {
+            const roomId = uuid();
+            connectLiveRoom(roomId, data.fromTab, data.handle, data.role);
+            broadcast({
+              type: 'MATCH_ACCEPT',
+              toTab: data.fromTab,
+              roomId,
+              handle: MY_ANON_HANDLE,
+              role: S.role
+            });
+          }
+        }
+
+        if (data.type === 'MATCH_ACCEPT' && data.toTab === TAB_ID && S.searching) {
+          connectLiveRoom(data.roomId, data.fromTab, data.handle, data.role);
+        }
+
+        if (data.type === 'CHAT_MSG' && S.chatMode === 'live' && data.roomId === S.roomId) {
+          $('#typing').classList.add('hidden');
+          addMsg(data.text, 'peer');
+        }
+
+        if (data.type === 'TYPING' && S.chatMode === 'live' && data.roomId === S.roomId) {
+          const typ = $('#typing');
+          typ.classList.remove('hidden');
+          clearTimeout(S.typingTimeout);
+          S.typingTimeout = setTimeout(() => typ.classList.add('hidden'), 1800);
+        }
+
+        if (data.type === 'LEAVE_ROOM' && S.chatMode === 'live' && data.roomId === S.roomId) {
+          addMsg(`${S.peer} left the session.`, 'system');
+          S.chatMode = 'idle';
+          S.roomId = null;
+          clearInterval(S.sessionTimer);
+          $('#chat-peer-badge').textContent = 'Disconnected';
+        }
+      };
+    }
+
+    setInterval(() => {
+      knownTabs.set(TAB_ID, Date.now());
+      broadcast({ type: 'HEARTBEAT' });
+      if (S.searching) {
+        broadcast({ type: 'SEEK_PEER', role: S.role, handle: MY_ANON_HANDLE });
+      }
+      updateActiveTabCount();
+    }, 2500);
+
+    function connectLiveRoom(roomId, peerTabId, peerHandle, peerRole) {
+      S.searching = false;
+      S.chatMode = 'live';
+      S.roomId = roomId;
+      S.peerTabId = peerTabId;
+      S.peer = peerHandle;
+
+      $('#find-match-btn').classList.remove('hidden');
+      $('#radar').classList.add('hidden');
+      $('#radar').classList.remove('flex');
+
+      $('#chat-peer-name').textContent = peerHandle;
+      $('#chat-avatar').textContent = peerHandle[0];
+      const badge = $('#chat-peer-badge');
+      badge.textContent = `Live Peer (${peerRole})`;
+      badge.className = 'text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300';
+      $('#chat-mode-note').textContent = '• Real-time cross-tab link';
+
+      $('#chat-messages').replaceChildren();
+      addMsg(`Connected live with ${peerHandle}. You are ${MY_ANON_HANDLE}.`, 'system');
+      startSession();
+      toast(`Matched live with ${peerHandle}`, 'success');
+    }
+
+    function startLiveQueue() {
+      if (S.searching) return;
+      S.searching = true;
+      $('#find-match-btn').classList.add('hidden');
+      $('#radar').classList.remove('hidden');
+      $('#radar').classList.add('flex');
+      broadcast({ type: 'SEEK_PEER', role: S.role, handle: MY_ANON_HANDLE });
+    }
+
+    function cancelMatch() {
+      S.searching = false;
+      $('#find-match-btn').classList.remove('hidden');
+      $('#radar').classList.add('hidden');
+      $('#radar').classList.remove('flex');
+    }
+
+    function startPracticeBot() {
+      cancelMatch();
+      const botName = newPeerId();
+      S.chatMode = 'bot';
+      S.roomId = null;
+      S.peer = botName;
+
+      $('#chat-peer-name').textContent = botName;
+      $('#chat-avatar').textContent = botName[0];
+      const badge = $('#chat-peer-badge');
+      badge.textContent = 'Practice Peer';
+      badge.className = 'text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300';
+      $('#chat-mode-note').textContent = '• Single-tab practice';
+
+      $('#chat-messages').replaceChildren();
+      addMsg(`Practice session started with ${botName}.`, 'system');
+      startSession();
+      toast(`Practice chat with ${botName}`, 'info');
+    }
+
+    /* ── FRIENDS & CROSS-TAB DM DATABASE ────────── */
+    function loadDb() {
+      try {
+        const raw = localStorage.getItem(DB_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          parsed.dms = parsed.dms || {};
+          parsed.blocked = parsed.blocked || {};
+          return parsed;
+        }
+      } catch {}
+      return seedDb();
+    }
+
+    function saveDb(db) {
+      try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {}
+    }
+
+    function seedDb() {
+      const now = Date.now();
+      const db = {
+        users: {
+          alice:   { handle: 'SilentOwl#4821',  created: now },
+          bob:     { handle: 'CalmPanda#1102',  created: now },
+          charlie: { handle: 'StarGazer#9940',  created: now },
+          dave:    { handle: 'QuietRiver#7701', created: now }
+        },
+        friends: { alice: ['bob'], bob: ['alice'], charlie: [], dave: [] },
+        requests: {
+          alice: [{ from: 'charlie', at: now }],
+          bob: [],
+          charlie: [],
+          dave: [{ from: 'alice', at: now }]
+        },
+        blocked: {},
+        dms: {
+          [threadId('alice', 'bob')]: [
+            { id: uuid(), from: 'bob', text: 'Hey! Glad we connected here. How is your evening going?', at: now - 120000 }
+          ]
+        }
+      };
+      saveDb(db);
+      return db;
+    }
+
+    function getMe() {
+      const me = sessionStorage.getItem(ME_KEY);
+      if (!me) return null;
+      const db = loadDb();
+      if (!db.users[me]) { sessionStorage.removeItem(ME_KEY); return null; }
+      return me;
+    }
+
+    function setMe(name) {
+      if (name) sessionStorage.setItem(ME_KEY, name);
+      else sessionStorage.removeItem(ME_KEY);
+    }
+
+    function makeBtn(label, tone, onClick) {
+      const tones = {
+        primary: 'bg-indigo-600 hover:bg-indigo-500 text-white',
+        success: 'bg-emerald-600 hover:bg-emerald-500 text-white',
+        danger:  'bg-rose-600 hover:bg-rose-500 text-white',
+        neutral: 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+      };
+      const b = document.createElement('button');
+      b.className = `px-3 py-1.5 rounded-lg text-xs font-semibold ${tones[tone] || tones.neutral}`;
+      b.textContent = label;
+      b.onclick = onClick;
+      return b;
+    }
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text != null) node.textContent = text;
+      return node;
+    }
+
+    function login() {
+      const input = $('#auth-username');
+      const name = input.value.trim().toLowerCase();
+      if (!name) return toast('Enter a username', 'error');
+      if (!/^[a-z0-9_]{3,16}$/.test(name)) return toast('3–16 chars, a-z 0-9 _ only', 'error');
+
+      const db = loadDb();
+      let created = false;
+      if (!db.users[name]) {
+        db.users[name] = { handle: newPeerId(), created: Date.now() };
+        db.friends[name] = [];
+        db.requests[name] = [];
+        saveDb(db);
+        created = true;
+      }
+      setMe(name);
+      input.value = '';
+      renderFriends();
+      toast(created ? `Account created: ${name}` : `Welcome back, ${name}`, 'success');
+    }
+
+    function logout() {
+      setMe(null);
+      if (S.chatMode === 'dm') endChat();
+      renderFriends();
+      toast('Logged out', 'info');
+    }
+
+    function lookupUser() {
+      const me = getMe();
+      if (!me) return toast('Log in first', 'error');
+      const query = $('#friend-search').value.trim().toLowerCase();
+      const resultEl = $('#user-lookup-result');
+      resultEl.replaceChildren();
+      if (!query) return;
+
+      const db = loadDb();
+      if (!db.users[query]) {
+        resultEl.appendChild(el('div', 'text-xs text-rose-400 p-2', `No user "${query}" found`));
+        return;
+      }
+      if (query === me) {
+        resultEl.appendChild(el('div', 'text-xs text-amber-400 p-2', "That's you!"));
+        return;
+      }
+      if ((db.blocked[me] || []).includes(query) || (db.blocked[query] || []).includes(me)) {
+        resultEl.appendChild(el('div', 'text-xs text-slate-400 p-2', 'User unavailable'));
+        return;
+      }
+
+      const alreadyFriends   = (db.friends[me] || []).includes(query);
+      const alreadyRequested = (db.requests[query] || []).some(r => r.from === me);
+      const incomingRequest  = (db.requests[me] || []).some(r => r.from === query);
+
+      const row = el('div', 'p-3 rounded-xl bg-slate-800/60 flex justify-between items-center flex-wrap gap-2');
+      const info = el('div', '');
+      info.append(el('div', 'font-semibold text-sm', query), el('div', 'text-xs text-slate-400 font-mono', db.users[query].handle));
+      row.appendChild(info);
+
+      let rightEl;
+      if (alreadyFriends) rightEl = makeBtn('Open DM', 'primary', () => openDmWith(query));
+      else if (alreadyRequested) rightEl = makeBtn('Cancel Request', 'neutral', () => cancelSentRequest(query));
+      else if (incomingRequest) rightEl = makeBtn('Accept Request', 'success', () => acceptRequest(query));
+      else rightEl = makeBtn('Add Friend', 'primary', () => sendFriendRequest(query));
+
+      row.appendChild(rightEl);
+      resultEl.appendChild(row);
+    }
+
+    function sendFriendRequest(target) {
+      const me = getMe();
+      if (!me) return;
+      const db = loadDb();
+      db.requests[target] = db.requests[target] || [];
+      if (db.requests[target].some(r => r.from === me)) return;
+      db.requests[target].push({ from: me, at: Date.now() });
+      saveDb(db);
+      toast(`Request sent to ${target}`, 'success');
+      lookupUser();
+      renderFriends();
+    }
+
+    function cancelSentRequest(target) {
+      const me = getMe();
+      if (!me) return;
+      const db = loadDb();
+      db.requests[target] = (db.requests[target] || []).filter(r => r.from !== me);
+      saveDb(db);
+      toast(`Cancelled request to ${target}`, 'info');
+      lookupUser();
+      renderFriends();
+    }
+
+    function acceptRequest(from) {
+      const me = getMe();
+      if (!me) return;
+      const db = loadDb();
+      db.requests[me] = (db.requests[me] || []).filter(r => r.from !== from);
+      db.friends[me] = db.friends[me] || [];
+      db.friends[from] = db.friends[from] || [];
+      if (!db.friends[me].includes(from)) db.friends[me].push(from);
+      if (!db.friends[from].includes(me)) db.friends[from].push(me);
+      saveDb(db);
+      toast(`You and ${from} are now friends`, 'success');
+      renderFriends();
+    }
+
+    function declineRequest(from) {
+      const me = getMe();
+      if (!me) return;
+      const db = loadDb();
+      db.requests[me] = (db.requests[me] || []).filter(r => r.from !== from);
+      saveDb(db);
+      renderFriends();
+    }
+
+    function removeFriend(fname, alsoBlock = false) {
+      const me = getMe();
+      if (!me) return;
+      const db = loadDb();
+      db.friends[me] = (db.friends[me] || []).filter(x => x !== fname);
+      db.friends[fname] = (db.friends[fname] || []).filter(x => x !== me);
+      if (alsoBlock) {
+        db.blocked[me] = db.blocked[me] || [];
+        if (!db.blocked[me].includes(fname)) db.blocked[me].push(fname);
+      }
+      saveDb(db);
+      if (S.chatMode === 'dm' && S.peer === fname) endChat();
+      toast(alsoBlock ? `Blocked ${fname}` : `Removed ${fname}`, 'info');
+      renderFriends();
+    }
+
+    function renderFriends() {
+      const me = getMe();
+      const db = loadDb();
+
+      const headerUser = $('#header-user');
+      if (headerUser) {
+        if (me) { headerUser.textContent = `@${me}`; headerUser.classList.remove('hidden'); }
+        else { headerUser.classList.add('hidden'); }
+      }
+
+      if (!me) {
+        $('#auth-logged-out').classList.remove('hidden');
+        $('#auth-logged-in').classList.add('hidden');
+        $('#friends-panel').classList.add('hidden');
+        return;
+      }
+
+      $('#auth-logged-out').classList.add('hidden');
+      $('#auth-logged-in').classList.remove('hidden');
+      $('#friends-panel').classList.remove('hidden');
+      $('#auth-name').textContent = me;
+      $('#auth-handle').textContent = db.users[me]?.handle || '';
+
+      const reqs = db.requests[me] || [];
+      $('#pending-count').textContent = reqs.length ? String(reqs.length) : '';
+      const pendingEl = $('#pending-list');
+      pendingEl.replaceChildren();
+      if (reqs.length === 0) {
+        pendingEl.appendChild(el('div', 'text-xs text-slate-500 italic p-2', 'No incoming requests'));
+      } else {
+        reqs.forEach(r => {
+          const row = el('div', 'p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex justify-between items-center flex-wrap gap-2');
+          const info = el('div', '');
+          info.append(el('div', 'font-semibold text-sm', r.from), el('div', 'text-xs text-slate-400 font-mono', db.users[r.from]?.handle || ''));
+          const btns = el('div', 'flex gap-2');
+          btns.append(makeBtn('Accept', 'success', () => acceptRequest(r.from)), makeBtn('Decline', 'danger', () => declineRequest(r.from)));
+          row.append(info, btns);
+          pendingEl.appendChild(row);
+        });
+      }
+
+      const outgoingEl = $('#outgoing-list');
+      outgoingEl.replaceChildren();
+      const sentTo = Object.keys(db.requests).filter(u => (db.requests[u] || []).some(r => r.from === me));
+      if (sentTo.length === 0) {
+        outgoingEl.appendChild(el('div', 'text-xs text-slate-500 italic p-2', 'No outgoing requests'));
+      } else {
+        sentTo.forEach(target => {
+          const row = el('div', 'p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex justify-between items-center flex-wrap gap-2');
+          row.append(
+            el('div', 'text-sm font-medium', `${target} (${db.users[target]?.handle || ''})`),
+            makeBtn('Cancel', 'neutral', () => cancelSentRequest(target))
+          );
+          outgoingEl.appendChild(row);
+        });
+      }
+
+      const friends = db.friends[me] || [];
+      $('#friends-count').textContent = friends.length ? String(friends.length) : '';
+      const listEl = $('#friends-list');
+      listEl.replaceChildren();
+      if (friends.length === 0) {
+        listEl.appendChild(el('div', 'text-xs text-slate-500 italic p-2', 'No friends yet — search a username above'));
+      } else {
+        friends.forEach(fname => {
+          const count = (db.dms[threadId(me, fname)] || []).length;
+          const row = el('div', 'p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex justify-between items-center flex-wrap gap-2');
+          const info = el('div', '');
+          info.append(
+            el('div', 'font-semibold text-sm', fname),
+            el('div', 'text-xs text-slate-400 font-mono', `${db.users[fname]?.handle || ''} • ${count} msg${count === 1 ? '' : 's'}`)
+          );
+          const btns = el('div', 'flex gap-1.5');
+          btns.append(
+            makeBtn('Open DM', 'primary', () => openDmWith(fname)),
+            makeBtn('Remove', 'neutral', () => removeFriend(fname, false)),
+            makeBtn('Block', 'danger', () => removeFriend(fname, true))
+          );
+          row.append(info, btns);
+          listEl.appendChild(row);
+        });
+      }
+
+      if (S.chatMode === 'dm' && me) renderDmThread(me, S.peer);
+    }
+
+    function openDmWith(username) {
+      const me = getMe();
+      if (!me) return toast('Log in first', 'error');
+      S.chatMode = 'dm';
+      S.peer = username;
+      $('#chat-peer-name').textContent = username;
+      $('#chat-avatar').textContent = username[0].toUpperCase();
+      const badge = $('#chat-peer-badge');
+      badge.textContent = 'Friend DM';
+      badge.className = 'text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300';
+      $('#chat-mode-note').textContent = '• Synced across browser tabs';
+      renderDmThread(me, username);
+      startSession();
+      location.hash = '#matchmaking';
+    }
+
+    function renderDmThread(me, partner) {
+      const db = loadDb();
+      const msgs = db.dms[threadId(me, partner)] || [];
+      const box = $('#chat-messages');
+      box.replaceChildren();
+      addMsg(`Direct message with ${partner}`, 'system');
+      msgs.forEach(m => addMsg(m.text, m.from === me ? 'me' : 'peer', false));
+    }
+
+    /* ── MESSAGING, RATE LIMIT & ANTI-DOXXING ───── */
+    const BOT_REPLIES = [
+      'I hear you. Take your time.',
+      'Thanks for sharing that with me.',
+      'That sounds heavy. How have you been holding up?',
+      'You do not have to rush through how you feel.'
+    ];
+    let botIdx = 0;
+    const burnTimers = new Set();
+
+    function looksLikePii(text) {
+      return /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(text) ||
+             /(?:\+?\d[\d\s().-]{7,}\d)/.test(text) ||
+             /(?:^|\s)@[a-z0-9_.]{3,}/i.test(text);
+    }
+
+    function addMsg(text, who, applyBurn = true) {
+      const box = $('#chat-messages');
+      const row = document.createElement('div');
+      if (who === 'system') {
+        row.className = 'text-center my-2';
+        row.appendChild(el('span', 'px-3 py-1 rounded-full bg-slate-800/80 text-xs text-slate-400', text));
+      } else {
+        row.className = who === 'me' ? 'flex justify-end' : 'flex items-start gap-2';
+        if (who === 'peer') {
+          row.appendChild(el('div', 'w-7 h-7 rounded-full bg-purple-600/30 text-purple-300 flex items-center justify-center text-xs shrink-0 font-bold', S.peer[0].toUpperCase()));
+        }
+        row.appendChild(el('div',
+          who === 'me'
+            ? 'bg-indigo-600 text-white p-3 rounded-2xl rounded-tr-none max-w-[85%] text-sm break-words'
+            : 'bg-slate-800 text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] border border-slate-700/50 text-sm break-words',
+          text));
+      }
+      box.appendChild(row);
+      box.scrollTop = box.scrollHeight;
+
+      if (applyBurn && S.burn === '1m' && who !== 'system') {
+        const t = setTimeout(() => { row.remove(); burnTimers.delete(t); }, 60000);
+        burnTimers.add(t);
+      }
+    }
+
+    function sendChat(bypassPii = false) {
+      const input = $('#chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      if (S.chatMode === 'idle') {
+        return toast('Start a live queue, practice peer, or Friend DM first', 'info');
+      }
+
+      const now = Date.now();
+      if (now - S.lastSentAt < 600) {
+        return toast('Slow down slightly between messages', 'info');
+      }
+
+      if (!bypassPii && looksLikePii(text)) {
+        S.pendingPiiText = text;
+        $('#pii-warning').classList.remove('hidden');
+        return;
+      }
+
+      S.lastSentAt = now;
+      $('#pii-warning').classList.add('hidden');
+      S.pendingPiiText = null;
+      input.value = '';
+
+      if (S.chatMode === 'dm') {
+        const me = getMe();
+        if (!me) return toast('Log in first', 'error');
+        const db = loadDb();
+        const tid = threadId(me, S.peer);
+        db.dms[tid] = db.dms[tid] || [];
+        db.dms[tid].push({ id: uuid(), from: me, text, at: now });
+        saveDb(db);
+        renderDmThread(me, S.peer);
+        renderFriends();
+        return;
+      }
+
+      addMsg(text, 'me');
+
+      if (S.chatMode === 'live') {
+        broadcast({ type: 'CHAT_MSG', roomId: S.roomId, text });
+        return;
+      }
+
+      const typing = $('#typing');
+      typing.classList.remove('hidden');
+      setTimeout(() => {
+        typing.classList.add('hidden');
+        addMsg(BOT_REPLIES[botIdx++ % BOT_REPLIES.length], 'peer');
+      }, 1100);
+    }
+
+    function startSession() {
+      clearInterval(S.sessionTimer);
+      S.sessionStart = Date.now();
+      S.sessionTimer = setInterval(() => {
+        const s = Math.floor((Date.now() - S.sessionStart) / 1000);
+        $('#chat-timer').textContent =
+          String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+      }, 1000);
+    }
+
+    function endChat() {
+      if (S.chatMode === 'live' && S.roomId) {
+        broadcast({ type: 'LEAVE_ROOM', roomId: S.roomId });
+      }
+      clearInterval(S.sessionTimer);
+      $('#chat-timer').textContent = '00:00';
+      S.chatMode = 'idle';
+      S.roomId = null;
+      S.peer = 'Not Connected';
+      $('#chat-peer-name').textContent = 'Not Connected';
+      $('#chat-avatar').textContent = '?';
+      const badge = $('#chat-peer-badge');
+      badge.textContent = 'Standby';
+      badge.className = 'text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400';
+      $('#chat-mode-note').textContent = '• Ready when you are';
+
+      if (S.burn === 'leave') {
+        burnTimers.forEach(clearTimeout);
+        burnTimers.clear();
+        $('#chat-messages').replaceChildren();
+      }
+      addMsg('Session ended. Your space is clear.', 'system');
+    }
+
+    function exportTranscript() {
+      const lines = [...$('#chat-messages').children].map(row => row.textContent.trim()).filter(Boolean);
+      if (!lines.length) return toast('Nothing to export yet', 'info');
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `anon-session-${new Date().toISOString().slice(0, 10)}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    /* ── ICEBREAKERS & VENT WALL ────────────────── */
+    const ICEBREAKERS = [
+      "What's one small thing that brought you a bit of relief recently?",
+      "If today had a weather forecast, what would it look like?",
+      "What's a song, show, or game that comforts you on hard days?",
+      "Do you want advice right now, or just someone to listen?"
+    ];
+    let iceIdx = 0;
+
+    function loadVents() {
+      try {
+        const raw = localStorage.getItem(VENTS_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch {}
+      const initial = [
+        { id: 'seed-1', tag: 'Venting', text: "Some days it feels like I'm trying so hard to keep everyone happy while drowning inside.", hugs: 14, strength: 6, time: '10m ago' },
+        { id: 'seed-2', tag: 'Hope', text: "To whoever needs to hear this: you survived 100% of your hardest days so far.", hugs: 38, strength: 19, time: '45m ago' }
+      ];
+      saveVents(initial);
+      return initial;
+    }
+
+    function saveVents(list) {
+      try { localStorage.setItem(VENTS_KEY, JSON.stringify(list)); } catch {}
+    }
+
+    function getMyVentIds() {
+      try { return new Set(JSON.parse(sessionStorage.getItem(MY_VENTS_K) || '[]')); }
+      catch { return new Set(); }
+    }
+
+    function addMyVentId(id) {
+      const ids = getMyVentIds();
+      ids.add(id);
+      try { sessionStorage.setItem(MY_VENTS_K, JSON.stringify([...ids])); } catch {}
+    }
+
+    function renderVents() {
+      const list = loadVents();
+      const mine = getMyVentIds();
+      const container = $('#vent-cards');
+      container.replaceChildren();
+
+      const tagStyles = {
+        Venting:   'bg-purple-500/20 text-purple-300 border-purple-500/30',
+        Advice:    'bg-amber-500/20 text-amber-300 border-amber-500/30',
+        Gratitude: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
+        Hope:      'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+      };
+
+      const filtered = list.filter(v => S.ventFilter === 'all' || v.tag === S.ventFilter);
+      if (!filtered.length) {
+        container.appendChild(el('div', 'glass p-6 rounded-2xl text-center text-xs text-slate-400', 'No posts in this category yet.'));
+        return;
+      }
+
+      filtered.forEach(v => {
+        const card = el('div', 'vent-card glass p-5 rounded-2xl space-y-3');
+        const head = el('div', 'flex justify-between items-center text-xs gap-2');
+        head.append(
+          el('span', `px-2.5 py-0.5 rounded-full border ${tagStyles[v.tag] || tagStyles.Venting}`, v.tag),
+          el('span', 'text-slate-400', `${v.time || 'Recently'} • Anonymous`)
+        );
+
+        const body = el('p', 'text-slate-200 text-sm break-words', `"${v.text}"`);
+        const foot = el('div', 'flex items-center justify-between gap-2 flex-wrap');
+        const reactions = el('div', 'flex gap-2 flex-wrap');
+
+        const hugBtn = document.createElement('button');
+        hugBtn.className = 'px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs';
+        hugBtn.append('🤗 Warm Hug ', el('span', 'font-bold text-indigo-400', String(v.hugs || 0)));
+        hugBtn.onclick = () => reactVent(v.id, 'hugs');
+
+        const strBtn = document.createElement('button');
+        strBtn.className = 'px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs';
+        strBtn.append('✨ Stay Strong ', el('span', 'font-bold text-emerald-400', String(v.strength || 0)));
+        strBtn.onclick = () => reactVent(v.id, 'strength');
+
+        reactions.append(hugBtn, strBtn);
+        foot.appendChild(reactions);
+
+        if (mine.has(v.id)) {
+          foot.appendChild(makeBtn('Delete', 'danger', () => deleteVent(v.id)));
+        }
+
+        card.append(head, body, foot);
+        container.appendChild(card);
+      });
+    }
+
+    function postVent() {
+      const text = $('#vent-input').value.trim();
+      if (!text) return toast('Write something first', 'error');
+      const tag = $('#vent-tag-select').value;
+      const list = loadVents();
+      const id = uuid();
+      list.unshift({ id, tag, text, hugs: 1, strength: 0, time: 'Just now' });
+      saveVents(list);
+      addMyVentId(id);
+      $('#vent-input').value = '';
+      renderVents();
+      toast('Posted anonymously', 'success');
+    }
+
+    function reactVent(id, field) {
+      const list = loadVents();
+      const item = list.find(v => v.id === id);
+      if (!item) return;
+      item[field] = (item[field] || 0) + 1;
+      saveVents(list);
+      renderVents();
+    }
+
+    function deleteVent(id) {
+      saveVents(loadVents().filter(v => v.id !== id));
+      renderVents();
+      toast('Post removed', 'info');
+    }
+
+    function filterVents(filter) {
+      S.ventFilter = filter;
+      $$('[data-action="ventFilter"]').forEach(b => {
+        const on = b.dataset.filter === filter;
+        b.setAttribute('aria-pressed', String(!on));
+        b.classList.toggle('bg-indigo-600', on);
+        b.classList.toggle('text-white', on);
+        b.classList.toggle('bg-slate-800', !on);
+      });
+      renderVents();
+    }
+
+    /* ── AUDIO & BREATHING ──────────────────────── */
+    const audio = {};
+    function toggleAudio(type) {
+      if (!audio.ctx) audio.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audio[type]) {
+        audio[type].src.stop();
+        delete audio[type];
+        const btn = document.getElementById(`btn-${type}`);
+        btn.textContent = 'Play';
+        btn.setAttribute('aria-pressed', 'false');
+        return;
+      }
+      const src = audio.ctx.createBufferSource();
+      const buf = audio.ctx.createBuffer(1, audio.ctx.sampleRate * 2, audio.ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      src.buffer = buf;
+      src.loop = true;
+
+      const filter = audio.ctx.createBiquadFilter();
+      filter.type = type === 'rain' ? 'highpass' : 'lowpass';
+      filter.frequency.value = type === 'rain' ? 1500 : 400;
+
+      const gain = audio.ctx.createGain();
+      gain.gain.value = +document.getElementById(`vol-${type}`).value;
+
+      src.connect(filter).connect(gain).connect(audio.ctx.destination);
+      src.start();
+      audio[type] = { src, gain };
+
+      const btn = document.getElementById(`btn-${type}`);
+      btn.textContent = 'Stop';
+      btn.setAttribute('aria-pressed', 'true');
+    }
+
+    let breathOn = false, breathTimer;
+    const PHASES = [['Inhale (4s)', 4000], ['Hold (7s)', 7000], ['Exhale (8s)', 8000]];
+    function toggleBreathing() {
+      breathOn = !breathOn;
+      const ring = $('#breathing-ring'), label = $('#breathing-label'), btn = $('#breathing-btn');
+      if (!breathOn) {
+        ring.classList.remove('breathing');
+        label.textContent = 'Tap Start';
+        btn.textContent = 'Start Breathing';
+        clearTimeout(breathTimer);
+        return;
+      }
+      ring.classList.add('breathing');
+      btn.textContent = 'Stop';
+      let i = 0;
+      (function loop() {
+        if (!breathOn) return;
+        label.textContent = PHASES[i][0];
+        breathTimer = setTimeout(() => { i = (i + 1) % 3; loop(); }, PHASES[i][1]);
+      })();
+    }
+
+    /* ── AFFIRMATIONS & EVENTS ──────────────────── */
+    const AFFIRM = [
+      "\"You don't have to carry it all by yourself.\"",
+      "\"Your feelings are valid, even when others don't understand.\"",
+      "\"Take a deep breath. You are doing the best you can.\"",
+      "\"Asking for support is a sign of courage, not weakness.\""
+    ];
+    let affIdx = 0, affPaused = false;
+    let affTimer = setInterval(() => stepAff(1), 5000);
+    function stepAff(dir) {
+      affIdx = (affIdx + dir + AFFIRM.length) % AFFIRM.length;
+      const node = $('#affirmation-text');
+      node.style.opacity = '0';
+      setTimeout(() => { node.textContent = AFFIRM[affIdx]; node.style.opacity = '1'; }, 200);
+    }
+
+    const actions = {
+      toggleThemeMenu: () => {
+        const menu = $('#theme-menu');
+        const hidden = menu.classList.toggle('hidden');
+        $('#theme-menu-btn').setAttribute('aria-expanded', String(!hidden));
+      },
+      theme: el => {
+        S.theme = el.dataset.theme;
+        document.documentElement.dataset.theme = S.theme;
+        $('#theme-menu').classList.add('hidden');
+        savePrefs();
+        toast(`Theme: ${S.theme}`, 'success');
+      },
+      font: el => {
+        S.font = Math.max(85, Math.min(125, S.font + (+el.dataset.delta) * 5));
+        document.documentElement.style.fontSize = S.font + '%';
+        savePrefs();
+      },
+      dyslexic: () => {
+        S.dyslexic = !S.dyslexic;
+        document.documentElement.dataset.dyslexic = String(S.dyslexic);
+        $('#dyslexic-btn').setAttribute('aria-pressed', String(S.dyslexic));
+        savePrefs();
+        toast(S.dyslexic ? 'Readable spacing ON' : 'Default font', 'info');
+      },
+      mask: () => $('#safe-mask').classList.remove('hidden'),
+      unmask: () => $('#safe-mask').classList.add('hidden'),
+      panic: () => panicExit(),
+      openModal: el => openModal(el.dataset.modal),
+      closeModal: el => closeModal(el.dataset.modal),
+      reportPeer: el => {
+        if (S.chatMode === 'dm') removeFriend(S.peer, true);
+        else { S.blockedPeers.add(S.peer); endChat(); }
+        closeModal('report-modal');
+        toast(`Blocked & reported (${el.dataset.reason})`, 'info');
+      },
+      aff: el => stepAff(+el.dataset.dir),
+      affPause: () => {
+        affPaused = !affPaused;
+        $('#aff-pause-btn').innerHTML = affPaused
+          ? '<i class="fa-solid fa-play" aria-hidden="true"></i>'
+          : '<i class="fa-solid fa-pause" aria-hidden="true"></i>';
+        if (affPaused) clearInterval(affTimer);
+        else affTimer = setInterval(() => stepAff(1), 5000);
+      },
+      role: el => {
+        S.role = el.dataset.role;
+        $$('[data-action="role"]').forEach(b => {
+          const on = b === el;
+          b.setAttribute('aria-pressed', String(on));
+          b.classList.toggle('border-indigo-500', on);
+          b.classList.toggle('bg-indigo-500/20', on);
+          b.classList.toggle('border-slate-700', !on);
+          b.classList.toggle('bg-slate-800/50', !on);
+        });
+      },
+      mood: el => {
+        const m = el.dataset.mood;
+        const on = !S.moods.has(m);
+        on ? S.moods.add(m) : S.moods.delete(m);
+        el.setAttribute('aria-pressed', String(on));
+        el.classList.toggle('border-indigo-500', on);
+        el.classList.toggle('bg-indigo-600/30', on);
+      },
+      nextIcebreaker: () => {
+        iceIdx = (iceIdx + 1) % ICEBREAKERS.length;
+        $('#icebreaker-text').textContent = `"${ICEBREAKERS[iceIdx]}"`;
+      },
+      useIcebreaker: () => { $('#chat-input').value = ICEBREAKERS[iceIdx]; $('#chat-input').focus(); },
+      match: startLiveQueue,
+      practiceBot: startPracticeBot,
+      cancelMatch,
+      send: () => sendChat(false),
+      forceSend: () => sendChat(true),
+      dismissPii: () => { $('#pii-warning').classList.add('hidden'); $('#chat-input').focus(); },
+      exportChat: exportTranscript,
+      clearChat: () => { $('#chat-messages').replaceChildren(); addMsg('Chat display cleared', 'system'); },
+      disconnect: endChat,
+      burn: el => { S.burn = el.value; toast(`Burn: ${el.value}`, 'info'); },
+      ventPost: postVent,
+      ventFilter: el => filterVents(el.dataset.filter),
+      audio: el => toggleAudio(el.dataset.audio),
+      breath: toggleBreathing,
+      copy: el => copy(el.dataset.text),
+      login,
+      logout,
+      userLookup: lookupUser
+    };
+
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#theme-menu') && !e.target.closest('#theme-menu-btn')) {
+        $('#theme-menu').classList.add('hidden');
+      }
+      const trigger = e.target.closest('[data-action]');
+      if (!trigger) return;
+      const fn = actions[trigger.dataset.action];
+      if (fn) fn(trigger);
+    });
+
+    document.addEventListener('input', e => {
+      const vol = e.target.closest('[data-volume]');
+      if (vol && audio[vol.dataset.volume]) {
+        audio[vol.dataset.volume].gain.gain.value = +vol.value;
+        return;
+      }
+      if (e.target.id === 'chat-input' && S.chatMode === 'live' && S.roomId) {
+        broadcast({ type: 'TYPING', roomId: S.roomId });
+      }
+    });
+
+    $('#chat-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(false); }
+    });
+    $('#auth-username').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); login(); }
+    });
+    $('#friend-search').addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); lookupUser(); }
+    });
+
+    /* ── DOUBLE ESCAPE SAFE EXIT & '/' SHORTCUT ─── */
+    let escCount = 0, escTimer = null;
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape' || e.repeat) return;
+      const openM = document.querySelector('.app-modal:not(.hidden)');
+      if (openM) { openM.classList.add('hidden'); return; }
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) return;
+
+      escCount++;
+      clearTimeout(escTimer);
+      if (escCount >= 2) { escCount = 0; panicExit(); return; }
+      const btn = document.querySelector('[data-action="panic"]');
+      if (btn) {
+        btn.classList.add('ring-2', 'ring-red-400');
+        setTimeout(() => btn.classList.remove('ring-2', 'ring-red-400'), 800);
+      }
+      escTimer = setTimeout(() => { escCount = 0; }, 800);
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        $('#chat-input').focus();
+      }
+    });
+
+    window.addEventListener('storage', e => {
+      if (e.key === DB_KEY) renderFriends();
+      if (e.key === VENTS_KEY) renderVents();
+    });
+
+    window.addEventListener('pagehide', () => {
+      if (S.chatMode === 'live' && S.roomId) broadcast({ type: 'LEAVE_ROOM', roomId: S.roomId });
+      if (audio.ctx && audio.ctx.state !== 'closed') { try { audio.ctx.close(); } catch {} }
+      clearInterval(S.sessionTimer);
+      clearInterval(affTimer);
+      clearTimeout(breathTimer);
+      burnTimers.forEach(clearTimeout);
+    });
+
+    loadPrefs();
+    renderFriends();
+    renderVents();
+    updateActiveTabCount();
+  </script>
+</body>
+</html>
