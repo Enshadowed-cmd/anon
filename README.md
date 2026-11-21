@@ -1,1 +1,1 @@
-# anon
+Anon is a browser-based, zero-backend anonymous peer-support and mental wellness web application designed to give users a safe, ephemeral space to vent, connect, and decompress without creating accounts or exposing personal data. Built entirely with standard web technologies—HTML5, Tailwind CSS, FontAwesome, custom CSS, and vanilla JavaScript—it runs as a self-contained client-side platform with no Python or server setup required.  
